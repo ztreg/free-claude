@@ -1,35 +1,32 @@
-import { useState } from 'react'
-import './App.css'
+import { Routes, Route, Navigate } from 'react-router-dom';
+import { useAuth } from './context/AuthContext';
+import Login from './components/Auth/Login';
+import Signup from './components/Auth/Signup';
+import Dashboard from './components/Dashboard';
+import './App.css';
 
 function App() {
-  const [count, setCount] = useState(0)
+  const { user, loading } = useAuth();
+
+  if (loading) {
+    return (
+      <div className="loading-screen">
+        <div className="loading-spinner"></div>
+        <p>Loading...</p>
+      </div>
+    );
+  }
 
   return (
     <div className="app">
-      <header className="header">
-        <h1>Keep track of your Stocks</h1>
-        <p>Monitor your investments in real-time</p>
-      </header>
-      
-      <main className="main">
-        <div className="card">
-          <h2>Interactive Counter</h2>
-          <div className="counter">
-            <button onClick={() => setCount(count - 1)}>-</button>
-            <span className="count">{count}</span>
-            <button onClick={() => setCount(count + 1)}>+</button>
-          </div>
-          <button className="reset" onClick={() => setCount(0)}>
-            Reset
-          </button>
-        </div>
-      </main>
-
-      <footer className="footer">
-        <p>Built with React + Vite</p>
-      </footer>
+      <Routes>
+        <Route path="/login" element={!user ? <Login /> : <Navigate to="/dashboard" />} />
+        <Route path="/signup" element={!user ? <Signup /> : <Navigate to="/dashboard" />} />
+        <Route path="/dashboard" element={user ? <Dashboard /> : <Navigate to="/login" />} />
+        <Route path="/" element={<Navigate to={user ? "/dashboard" : "/login"} />} />
+      </Routes>
     </div>
-  )
+  );
 }
 
-export default App
+export default App;
