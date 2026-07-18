@@ -1,11 +1,12 @@
 import { createContext, useContext, useState, useCallback } from 'react';
+import Snackbar from '../components/Snackbar';
 
 const NotificationContext = createContext();
 
 export function NotificationProvider({ children }) {
   const [notification, setNotification] = useState(null);
 
-  const showNotification = useCallback((message, type = 'success', duration = 3000) => {
+  const showNotification = useCallback((message, type = 'success', duration = 5000) => {
     setNotification({ message, type, duration });
   }, []);
 

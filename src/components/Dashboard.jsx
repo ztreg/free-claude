@@ -56,9 +56,9 @@ function Dashboard() {
       if (selectedStock?.ticker === ticker) {
         setSelectedStock(null);
       }
-      showNotification(`${ticker} removed from watchlist`, 'success');
+      showNotification(`${ticker} removed from watchlist`, 'success', 5000);
     } catch (error) {
-      showNotification('Failed to remove stock', 'error');
+      showNotification('Failed to remove stock', 'error', 5000);
     }
   };
 

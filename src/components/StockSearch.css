@@ -148,6 +148,23 @@
   background: #0052a3;
 }
 
+.tracked-indicator {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  background: #059669;
+  border-radius: 4px;
+  flex-shrink: 0;
+}
+
+.checkmark {
+  color: #ffffff;
+  font-size: 1rem;
+  font-weight: bold;
+}
+
 .stock-inspection-modal {
   position: fixed;
   top: 0;
@@ -275,6 +292,25 @@
 
 .inspection-add-button:hover {
   background: #0052a3;
+}
+
+.tracked-status {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.75rem;
+  background: #f0fdf4;
+  border: 1px solid #bbf7d0;
+  border-radius: 4px;
+  color: #059669;
+  font-size: 0.875rem;
+  font-weight: 500;
+}
+
+.checkmark-large {
+  font-size: 1.25rem;
+  font-weight: bold;
 }
 
 @media (min-width: 640px) {

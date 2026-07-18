@@ -50,7 +50,8 @@ export async function addToWatchlist(stock) {
       .single();
     
     if (error) {
-      if (error.code === '23505') { // Unique violation
+      if (error.code === '23505' || error.code === '409' || error.status === 409) { 
+        // Unique violation or conflict
         throw new Error('Stock already in watchlist');
       }
       throw error;

@@ -16,7 +16,7 @@ function Header({ title, showNavButton = false, navButtonAction = null, navButto
       navigate('/login');
       setShowDropdown(false);
     } catch (error) {
-      showNotification('Failed to sign out', 'error');
+      showNotification('Failed to sign out', 'error', 5000);
       console.error('Sign out error:', error);
     }
   };

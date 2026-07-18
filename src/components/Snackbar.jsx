@@ -1,7 +1,7 @@
 import { useEffect } from 'react';
 import './Snackbar.css';
 
-function Snackbar({ message, type = 'success', onClose, duration = 3000 }) {
+function Snackbar({ message, type = 'success', onClose, duration = 5000 }) {
   useEffect(() => {
     const timer = setTimeout(() => {
       onClose();

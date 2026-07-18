@@ -2,13 +2,17 @@ import { useState } from 'react';
 import { searchStocks, getStockPrice } from '../services/stockApi';
 import './StockSearch.css';
 
-function StockSearch({ onAddStock }) {
+function StockSearch({ onAddStock, watchlist }) {
   const [query, setQuery] = useState('');
   const [results, setResults] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [inspectingStock, setInspectingStock] = useState(null);
   const [loadingPrice, setLoadingPrice] = useState(false);
+
+  const isStockInWatchlist = (symbol) => {
+    return watchlist.some(stock => stock.ticker === symbol);
+  };
 
   const handleSearch = async (e) => {
     e.preventDefault();
@@ -35,8 +39,7 @@ function StockSearch({ onAddStock }) {
 
   const handleAddStock = (stock) => {
     onAddStock(stock);
-    setQuery('');
-    setResults([]);
+    // Don't clear results - let user add more stocks from same search
     setInspectingStock(null);
   };
 
@@ -80,31 +83,40 @@ function StockSearch({ onAddStock }) {
         <div className="search-results">
           <h3>Search Results</h3>
           <ul className="results-list">
-            {results.map((stock, index) => (
-              <li key={index} className="result-item">
-                <div 
-                  className="stock-info clickable"
-                  onClick={() => handleInspectStock(stock)}
-                >
-                  <span className="stock-symbol">{stock.symbol}</span>
-                  <span className="stock-name">{stock.name}</span>
-                  {stock.type && (
-                    <span className="stock-details">
-                      {stock.type}
-                    </span>
+            {results.map((stock, index) => {
+              const isInWatchlist = isStockInWatchlist(stock.symbol);
+              return (
+                <li key={index} className="result-item">
+                  <div 
+                    className="stock-info clickable"
+                    onClick={() => handleInspectStock(stock)}
+                  >
+                    <span className="stock-symbol">{stock.symbol}</span>
+                    <span className="stock-name">{stock.name}</span>
+                    {stock.type && (
+                      <span className="stock-details">
+                        {stock.type}
+                      </span>
+                    )}
+                  </div>
+                  {isInWatchlist ? (
+                    <div className="tracked-indicator">
+                      <span className="checkmark">✓</span>
+                    </div>
+                  ) : (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleAddStock(stock);
+                      }}
+                      className="add-button"
+                    >
+                      + Add
+                    </button>
                   )}
-                </div>
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleAddStock(stock);
-                  }}
-                  className="add-button"
-                >
-                  Search
-                </button>
-              </li>
-            ))}
+                </li>
+              );
+            })}
           </ul>
         </div>
       )}
@@ -135,12 +147,19 @@ function StockSearch({ onAddStock }) {
             )}
 
             <div className="inspection-actions">
-              <button 
-                onClick={() => handleAddStock(inspectingStock)}
-                className="inspection-add-button"
-              >
-                Add to Watchlist
-              </button>
+              {isStockInWatchlist(inspectingStock.symbol) ? (
+                <div className="tracked-status">
+                  <span className="checkmark-large">✓</span>
+                  <span>Already in watchlist</span>
+                </div>
+              ) : (
+                <button 
+                  onClick={() => handleAddStock(inspectingStock)}
+                  className="inspection-add-button"
+                >
+                  Add to Watchlist
+                </button>
+              )}
             </div>
           </div>
         </div>
