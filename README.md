@@ -1,86 +1,115 @@
-# Aktiebevakare
+# Simple React App
 
-Följ aktier och spara automatiskt end-of-day-data (öppning, högsta, lägsta, slut, volym)
-i en egen SQLite-databas (`stocks.db`). Yahoo Finance är primär källa, Stooq används som
-fallback om Yahoo strular.
+A simple React application built with Vite, ready for deployment on free hosting platforms.
 
-## Installation (en gång)
+## Features
 
-Kräver Python 3.9+.
+- ⚡ Fast development with Vite
+- 🎨 Modern, responsive design
+- 🚀 Ready for deployment on Netlify, Vercel, or GitHub Pages
+- 💾 No build configuration needed
+
+## Getting Started
+
+### Prerequisites
+
+- Node.js 16+ and npm/yarn/pnpm
+
+### Installation
 
 ```bash
-cd stocktracker
-python -m venv venv
-source venv/bin/activate        # Windows: venv\Scripts\activate
-pip install -r requirements.txt
+# Install dependencies
+npm install
+
+# Start development server
+npm run dev
 ```
 
-## Användning
+The app will open at `http://localhost:3000`
+
+### Building for Production
 
 ```bash
-# Börja följa aktier (Stockholmsaktier har suffixet .ST)
-python tracker.py add ERIC-B.ST VOLV-B.ST INVE-B.ST
+# Build the app
+npm run build
 
-# Visa vad du följer + senaste sparade kurs
-python tracker.py list
-
-# Hämta EOD-data för alla bevakade aktier
-python tracker.py update
-
-# Första gången kan du fylla på historik bakåt (t.ex. 90 dagar)
-python tracker.py update --backfill 90
-
-# Titta på sparad data för en aktie
-python tracker.py show ERIC-B.ST --days 30
-
-# Sluta följa
-python tracker.py remove VOLV-B.ST
-
-# Exportera allt till CSV (t.ex. för Excel)
-python tracker.py export prices.csv
+# Preview production build
+npm run preview
 ```
 
-`update` är idempotent: den hämtar bara dagar som saknas, så du kan köra den hur ofta
-du vill utan dubbletter. Kör du på en helg/röd dag säger den bara "aktuell".
+## Deployment
 
-### Ticker-format
-- Stockholm: `ERIC-B.ST`, `VOLV-B.ST`, `INVE-B.ST`
-- Index: `^OMX`, `^OMXS30`
-- Hitta rätt ticker på finance.yahoo.com genom att söka på bolaget.
+### Option 1: Netlify (Easiest)
 
-## Automatisk körning varje kväll
+1. Run `npm run build`
+2. Go to [netlify.com](https://netlify.com) and sign up/login
+3. Drag and drop the `dist` folder into the "Sites" area
+4. Your site will be live instantly!
 
-Börsen i Stockholm stänger 17:30. Kör t.ex. 18:30 så all data hunnit uppdateras.
+### Option 2: Vercel
 
-### macOS / Linux (cron)
+1. Push your code to GitHub
+2. Go to [vercel.com](https://vercel.com) and sign up/login
+3. Click "New Project" and import your GitHub repository
+4. Vercel will automatically detect the Vite configuration
+5. Click "Deploy" - your site will be live in seconds!
+
+### Option 3: GitHub Pages
+
+1. Update `package.json`:
+   - Change `homepage` to your GitHub Pages URL: `"https://your-username.github.io/your-repo-name/"`
+   - Update `vite.config.js`: Change `base: '/'` to `base: '/your-repo-name/'`
+
+2. Install gh-pages and deploy:
 ```bash
-crontab -e
+npm install
+npm run build
+npm run deploy:github
 ```
-Lägg till (byt ut sökvägen till din mapp):
+
+3. Enable GitHub Pages in your repository settings:
+   - Go to Settings → Pages
+   - Select `gh-pages` branch as the source
+
+## Customization
+
+### Modify the App
+
+Edit `src/App.jsx` to change the content and functionality.
+
+### Change Styling
+
+- Global styles: `src/index.css`
+- Component styles: `src/App.css`
+
+### Add New Components
+
+Create new `.jsx` files in the `src/` directory and import them in `App.jsx`.
+
+## Project Structure
+
 ```
-30 18 * * 1-5  cd /full/sokvag/stocktracker && ./venv/bin/python tracker.py update >> update.log 2>&1
+.
+├── index.html          # HTML entry point
+├── package.json        # Dependencies and scripts
+├── vite.config.js      # Vite configuration
+├── netlify.toml        # Netlify deployment config
+├── vercel.json         # Vercel deployment config
+├── src/
+│   ├── main.jsx        # React entry point
+│   ├── App.jsx         # Main component
+│   ├── App.css         # Component styles
+│   └── index.css       # Global styles
+└── dist/               # Build output (generated)
 ```
-`1-5` = måndag–fredag.
 
-### Windows (Task Scheduler)
-1. Öppna "Task Scheduler" → "Create Basic Task".
-2. Trigger: Daily, kl 18:30.
-3. Action: "Start a program".
-   - Program: `C:\full\sokvag\stocktracker\venv\Scripts\python.exe`
-   - Arguments: `tracker.py update`
-   - Start in: `C:\full\sokvag\stocktracker`
+## Available Scripts
 
-## Databasen
+- `npm run dev` - Start development server
+- `npm run build` - Build for production
+- `npm run preview` - Preview production build locally
+- `npm run deploy:github` - Deploy to GitHub Pages
 
-`stocks.db` är en vanlig SQLite-fil. Öppna med valfritt verktyg (DB Browser for SQLite,
-`sqlite3 stocks.db`, eller vilket språk som helst). Tabeller:
+## License
 
-- `watchlist(ticker, added_at)`
-- `prices(ticker, date, open, high, low, close, volume, source)` — nyckel: (ticker, date)
-
-## Noteringar
-- Yahoo har inget officiellt API; `yfinance` reverse-engineerar det och kan gå sönder
-  ibland. Därför finns Stooq som fallback vid fel. Stooqs symbolformat för nordiska
-  aktier är dock inkonsekvent — behöver du förlita dig på fallbacken kan du behöva justera
-  `_to_stooq_symbol()` i `tracker.py`.
-- Endast för privat/hobbybruk. Datan är fördröjd och kan innehålla luckor.
+MIT
