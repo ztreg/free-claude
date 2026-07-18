@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
+import logo from '../../logo.png';
 import './Auth.css';
 
 function Login() {
@@ -30,33 +31,44 @@ function Login() {
   return (
     <div className="auth-container">
       <div className="auth-card">
+        <div className="auth-logo">
+          <img src="/logo.png" alt="Logo" className="auth-logo-img" />
+        </div>
         <h1>Welcome Back</h1>
         <p className="auth-subtitle">Sign in to track your stocks</p>
         
         {error && <div className="auth-error">{error}</div>}
         
-        <form onSubmit={handleSubmit} className="auth-form">
+        <form onSubmit={handleSubmit} className="auth-form" autoComplete="off">
           <div className="form-group">
-            <label htmlFor="username">Username</label>
+            <label htmlFor="username-field">Username</label>
             <input
-              id="username"
+              id="username-field"
+              name="username-field"
               type="text"
               value={username}
               onChange={(e) => setUsername(e.target.value)}
               required
               placeholder="Enter your username"
+              autoComplete="off"
+              readOnly
+              onFocus={(e) => e.target.removeAttribute('readOnly')}
             />
           </div>
           
           <div className="form-group">
-            <label htmlFor="password">Password</label>
+            <label htmlFor="password-field">Password</label>
             <input
-              id="password"
+              id="password-field"
+              name="password-field"
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required
               placeholder="Enter your password"
+              autoComplete="new-password"
+              readOnly
+              onFocus={(e) => e.target.removeAttribute('readOnly')}
             />
           </div>
           

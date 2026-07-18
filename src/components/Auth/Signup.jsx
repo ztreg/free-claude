@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
+import logo from '../../logo.png';
 import './Auth.css';
 
 function Signup() {
@@ -42,45 +43,60 @@ function Signup() {
   return (
     <div className="auth-container">
       <div className="auth-card">
+        <div className="auth-logo">
+          <img src="/logo.png" alt="Logo" className="auth-logo-img" />
+        </div>
         <h1>Create Account</h1>
         <p className="auth-subtitle">Start tracking your stocks today</p>
         
         {error && <div className="auth-error">{error}</div>}
         
-        <form onSubmit={handleSubmit} className="auth-form">
+        <form onSubmit={handleSubmit} className="auth-form" autoComplete="off">
           <div className="form-group">
-            <label htmlFor="username">Username</label>
+            <label htmlFor="signup-username">Username</label>
             <input
-              id="username"
+              id="signup-username"
+              name="signup-username"
               type="text"
               value={username}
               onChange={(e) => setUsername(e.target.value)}
               required
               placeholder="Choose a username"
+              autoComplete="off"
+              readOnly
+              onFocus={(e) => e.target.removeAttribute('readOnly')}
             />
           </div>
           
           <div className="form-group">
-            <label htmlFor="password">Password</label>
+            <label htmlFor="signup-password">Password</label>
             <input
-              id="password"
+              id="signup-password"
+              name="signup-password"
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required
               placeholder="Create a password (min 6 characters)"
+              autoComplete="new-password"
+              readOnly
+              onFocus={(e) => e.target.removeAttribute('readOnly')}
             />
           </div>
           
           <div className="form-group">
-            <label htmlFor="confirmPassword">Confirm Password</label>
+            <label htmlFor="signup-confirm">Confirm Password</label>
             <input
-              id="confirmPassword"
+              id="signup-confirm"
+              name="signup-confirm"
               type="password"
               value={confirmPassword}
               onChange={(e) => setConfirmPassword(e.target.value)}
               required
               placeholder="Confirm your password"
+              autoComplete="new-password"
+              readOnly
+              onFocus={(e) => e.target.removeAttribute('readOnly')}
             />
           </div>
           

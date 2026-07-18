@@ -1,14 +1,16 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
+import { useNotification } from '../context/NotificationContext';
 import { useNavigate } from 'react-router-dom';
-import StockSearch from './StockSearch';
 import StockChart from './StockChart';
-import { getWatchlist, addToWatchlist, removeFromWatchlist } from '../services/watchlistService';
+import Header from './Header';
+import { getWatchlist, removeFromWatchlist, addToWatchlist } from '../services/watchlistService';
 import { getStockPrice } from '../services/stockApi';
 import './Dashboard.css';
 
 function Dashboard() {
   const { user, signOut } = useAuth();
+  const { showNotification } = useNotification();
   const navigate = useNavigate();
   const [watchlist, setWatchlist] = useState([]);
   const [stockPrices, setStockPrices] = useState({});
@@ -43,13 +45,8 @@ function Dashboard() {
     }
   };
 
-  const handleAddStock = async (stock) => {
-    try {
-      await addToWatchlist(stock);
-      await loadWatchlist();
-    } catch (error) {
-      alert(error.message);
-    }
+  const handleNavigateToSearch = () => {
+    navigate('/search');
   };
 
   const handleRemoveStock = async (ticker) => {
@@ -59,8 +56,9 @@ function Dashboard() {
       if (selectedStock?.ticker === ticker) {
         setSelectedStock(null);
       }
+      showNotification(`${ticker} removed from watchlist`, 'success');
     } catch (error) {
-      alert('Failed to remove stock');
+      showNotification('Failed to remove stock', 'error');
     }
   };
 
@@ -75,31 +73,20 @@ function Dashboard() {
 
   return (
     <div className="dashboard">
-      <header className="dashboard-header">
-        <h1>Stock Tracker</h1>
-        <div className="user-info">
-          <span>{user?.email?.split('@')[0] || 'User'}</span>
-          <button onClick={handleSignOut} className="sign-out-button">
-            Sign Out
-          </button>
-        </div>
-      </header>
+      <Header title="Tompa Stocks" showNavButton={true} navButtonAction={handleNavigateToSearch} navButtonText="Search Stocks" />
 
       <main className="dashboard-main">
         <div className="dashboard-content">
-          <section className="search-section">
-            <h2>Add Stocks to Watchlist</h2>
-            <StockSearch onAddStock={handleAddStock} />
-          </section>
-
           <section className="watchlist-section">
-            <h2>Your Watchlist</h2>
+            <div className="watchlist-header">
+              <h2>My Watchlist</h2>
+            </div>
             {loading ? (
               <div className="loading">Loading your watchlist...</div>
             ) : watchlist.length === 0 ? (
               <div className="empty-state">
                 <p>No stocks in your watchlist yet.</p>
-                <p>Search and add stocks above to get started!</p>
+                <p>Use the "Search Stocks" button in the header to get started!</p>
               </div>
             ) : (
               <div className="watchlist-grid">

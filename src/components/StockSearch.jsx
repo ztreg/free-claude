@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { searchStocks } from '../services/stockApi';
+import { searchStocks, getStockPrice } from '../services/stockApi';
 import './StockSearch.css';
 
 function StockSearch({ onAddStock }) {
@@ -7,6 +7,8 @@ function StockSearch({ onAddStock }) {
   const [results, setResults] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [inspectingStock, setInspectingStock] = useState(null);
+  const [loadingPrice, setLoadingPrice] = useState(false);
 
   const handleSearch = async (e) => {
     e.preventDefault();
@@ -15,6 +17,7 @@ function StockSearch({ onAddStock }) {
     setLoading(true);
     setError('');
     setResults([]);
+    setInspectingStock(null);
 
     try {
       const stocks = await searchStocks(query);
@@ -34,6 +37,26 @@ function StockSearch({ onAddStock }) {
     onAddStock(stock);
     setQuery('');
     setResults([]);
+    setInspectingStock(null);
+  };
+
+  const handleInspectStock = async (stock) => {
+    setInspectingStock(stock);
+    setLoadingPrice(true);
+    
+    try {
+      const priceData = await getStockPrice(stock.symbol);
+      setInspectingStock({ ...stock, priceData });
+    } catch (err) {
+      console.error('Error loading stock price:', err);
+      setInspectingStock({ ...stock, priceData: null });
+    } finally {
+      setLoadingPrice(false);
+    }
+  };
+
+  const closeInspection = () => {
+    setInspectingStock(null);
   };
 
   return (
@@ -59,22 +82,67 @@ function StockSearch({ onAddStock }) {
           <ul className="results-list">
             {results.map((stock, index) => (
               <li key={index} className="result-item">
-                <div className="stock-info">
+                <div 
+                  className="stock-info clickable"
+                  onClick={() => handleInspectStock(stock)}
+                >
                   <span className="stock-symbol">{stock.symbol}</span>
                   <span className="stock-name">{stock.name}</span>
-                  <span className="stock-details">
-                    {stock.region} • {stock.currency}
-                  </span>
+                  {stock.type && (
+                    <span className="stock-details">
+                      {stock.type}
+                    </span>
+                  )}
                 </div>
                 <button
-                  onClick={() => handleAddStock(stock)}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleAddStock(stock);
+                  }}
                   className="add-button"
                 >
-                  + Add
+                  Search
                 </button>
               </li>
             ))}
           </ul>
+        </div>
+      )}
+
+      {inspectingStock && (
+        <div className="stock-inspection-modal">
+          <div className="inspection-content">
+            <div className="inspection-header">
+              <h2>{inspectingStock.symbol}</h2>
+              <button onClick={closeInspection} className="close-button">×</button>
+            </div>
+            <p className="inspection-company">{inspectingStock.name}</p>
+            
+            {loadingPrice ? (
+              <div className="inspection-loading">Loading price data...</div>
+            ) : inspectingStock.priceData ? (
+              <div className="inspection-price">
+                <span className="inspection-current-price">
+                  ${inspectingStock.priceData.price.toFixed(2)}
+                </span>
+                <span className={`inspection-change ${inspectingStock.priceData.change >= 0 ? 'positive' : 'negative'}`}>
+                  {inspectingStock.priceData.change >= 0 ? '+' : ''}{inspectingStock.priceData.change.toFixed(2)} 
+                  ({inspectingStock.priceData.changePercent.toFixed(2)}%)
+                </span>
+              </div>
+            ) : (
+              <div className="inspection-error">Price data unavailable</div>
+            )}
+
+            <div className="inspection-actions">
+              <button 
+                onClick={() => handleAddStock(inspectingStock)}
+                className="inspection-add-button"
+              >
+                Add to Watchlist
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>

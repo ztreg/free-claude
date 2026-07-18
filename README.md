@@ -125,7 +125,7 @@ VITE_SUPABASE_ANON_KEY=your_supabase_anon_key
 
 1. **Sign Up**: Create an account with your desired username and password
 2. **Search Stocks**: Use the search bar to find stocks by symbol or company name
-3. **Add to Watchlist**: Click "+ Add" to track stocks
+3. **Add to Watchlist**: Click "Search" to track stocks
 4. **View Dashboard**: See all your followed stocks with current prices
 5. **Analyze**: Click on any stock to view detailed charts and performance
 
