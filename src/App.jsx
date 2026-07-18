@@ -7,8 +7,8 @@ function App() {
   return (
     <div className="app">
       <header className="header">
-        <h1>Simple React App</h1>
-        <p>Ready to deploy on free hosting platforms</p>
+        <h1>Keep track of your Stocks</h1>
+        <p>Monitor your investments in real-time</p>
       </header>
       
       <main className="main">
@@ -22,15 +22,6 @@ function App() {
           <button className="reset" onClick={() => setCount(0)}>
             Reset
           </button>
-        </div>
-
-        <div className="info">
-          <h3>Deployment Options</h3>
-          <ul>
-            <li><strong>Netlify</strong> - Drag and drop the dist folder</li>
-            <li><strong>Vercel</strong> - Connect your GitHub repository</li>
-            <li><strong>GitHub Pages</strong> - Use gh-pages branch</li>
-          </ul>
         </div>
       </main>
 
