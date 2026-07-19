@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { useNavigate } from 'react-router-dom';
 import { useNotification } from '../context/NotificationContext';
 import { useCurrency } from '../context/CurrencyContext';
 import './Header.css';
@@ -57,9 +57,9 @@ function Header({ title, showNavButton = false, navButtonAction = null, navButto
   return (
     <header className="header">
       <div className="header-left">
-        <a href="/dashboard" className="logo-link">
+        <Link to="/dashboard" className="logo-link">
           <img src="/logo.png" alt="Logo" className="logo" />
-        </a>
+        </Link>
         <h1>{title}</h1>
       </div>
       <div className="header-right">

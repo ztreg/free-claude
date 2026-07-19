@@ -1,7 +1,6 @@
 import { useState } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
-import { useNavigate } from 'react-router-dom';
-import logo from '../../logo.png';
 import './Auth.css';
 
 function Login() {
@@ -21,7 +20,7 @@ function Login() {
     try {
       await signIn(username, password);
       navigate('/dashboard');
-    } catch (err) {
+    } catch {
       setError('Invalid username or password');
     } finally {
       setLoading(false);
@@ -78,7 +77,7 @@ function Login() {
         </form>
         
         <p className="auth-switch">
-          Don't have an account? <a href="/signup">Sign up</a>
+          Don't have an account? <Link to="/signup">Sign up</Link>
         </p>
       </div>
     </div>

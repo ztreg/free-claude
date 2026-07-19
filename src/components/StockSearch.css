@@ -99,9 +99,11 @@
   display: flex;
   flex-direction: column;
   gap: 0.25rem;
-  cursor: default;
   flex: 1;
   min-width: 0;
+  border: none;
+  background: transparent;
+  text-align: left;
 }
 
 .stock-info.clickable {
@@ -111,14 +113,31 @@
   border-radius: 4px;
 }
 
-.stock-info.clickable:hover {
+.stock-info.clickable:hover,
+.stock-info.clickable:focus-visible {
   background: #f3f4f6;
+  outline: none;
 }
 
 .stock-symbol {
   font-weight: 600;
   color: #1a1a1a;
   font-size: 0.875rem;
+}
+
+.stock-top-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.stock-price {
+  font-weight: 600;
+  color: #1d4ed8;
+  font-size: 0.875rem;
+  white-space: nowrap;
 }
 
 .stock-name {

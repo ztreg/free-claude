@@ -1,6 +1,14 @@
 [build]
   command = "npm run build"
   publish = "dist"
+  functions = "netlify/functions"
+
+[[redirects]]
+  from = "/api/stock/:symbol"
+  to = "/.netlify/functions/stock?symbol=:symbol"
+  status = 200
+  force = true
+  preserveQueryString = true
 
 [[redirects]]
   from = "/*"

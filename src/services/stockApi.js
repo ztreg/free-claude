@@ -1,11 +1,32 @@
 import axios from 'axios';
 
 // Finnhub API - Free tier: 60 calls/minute (86,400/day)
-const FINNHUB_API_KEY = import.meta.env.VITE_FINNHUB_API_KEY || 'YOUR_FINNHUB_API_KEY';
+const rawFinnhubKey = import.meta.env.VITE_FINNHUB_API_KEY ?? '';
+const FINNHUB_API_KEY = rawFinnhubKey.trim();
 
 // Oanor API - Free Swedish stock API (100 calls/month free tier)
-const OANOR_API_KEY = import.meta.env.VITE_OANOR_API_KEY || '';
+const OANOR_API_KEY = (import.meta.env.VITE_OANOR_API_KEY || '').trim();
+
+function isPlaceholderFinnhubKey(key) {
+  return !key || /your[_-]?finnhub[_-]?api[_-]?key/i.test(key);
+}
+
+function ensureFinnhubKey() {
+  if (isPlaceholderFinnhubKey(FINNHUB_API_KEY)) {
+    throw new Error('Finnhub API key is missing or invalid. Please set VITE_FINNHUB_API_KEY in your .env file.');
+  }
+}
 const OANOR_API_BASE = 'https://api.oanor.com/v1';
+
+const YAHOO_SYMBOL_OVERRIDES = {
+  'BODY.SL': 'STHLM.ST',
+  'STHLM.SL': 'STHLM.ST'
+};
+
+const YAHOO_SYMBOL_FALLBACKS = {
+  'BODY.SL': ['STHLM.ST', 'STHLM.XSAT', 'BODY.ST'],
+  'STHLM.SL': ['STHLM.ST', 'STHLM.XSAT', 'BODY.ST']
+};
 
 // Exchange rates (base: USD) - Fetched from currency API
 let EXCHANGE_RATES = {
@@ -15,11 +36,13 @@ let EXCHANGE_RATES = {
   GBP: 0.79   // Fallback rate - will be updated dynamically
 };
 
+const pendingPriceRequests = new Map();
+
 // Fetch live exchange rates from exchangerate-api.com
 async function fetchExchangeRates() {
   try {
     const response = await axios.get('https://api.exchangerate-api.com/v4/latest/USD');
-    if (response.data && response.data.rates) {
+    if (response?.data?.rates) {
       EXCHANGE_RATES = {
         USD: 1.0,
         SEK: response.data.rates.SEK || 10.5,
@@ -57,7 +80,7 @@ function normalizeSymbol(symbol) {
 // Detect if a symbol is likely a Swedish/Nordic stock
 function isNordicStock(symbol) {
   // Check for common Nordic exchange suffixes
-  const nordicExchanges = ['.ST', '.HE', '.CO', '.OL'];
+  const nordicExchanges = ['.ST', '.HE', '.CO', '.OL', '.SL'];
   return nordicExchanges.some(ext => symbol.toUpperCase().endsWith(ext));
 }
 
@@ -98,14 +121,203 @@ async function getOanorStockData(symbol) {
   }
 }
 
+async function searchFinnhubSymbol(query) {
+  try {
+    ensureFinnhubKey();
+    const response = await axios.get(
+      `https://finnhub.io/api/v1/search?q=${encodeURIComponent(query)}&token=${FINNHUB_API_KEY}`
+    );
+
+    const results = response?.data?.result || [];
+    if (results.length === 0) {
+      return null;
+    }
+
+    const upperQuery = query.toUpperCase();
+    const exactMatch = results.find((item) => item.symbol?.toUpperCase() === upperQuery);
+    if (exactMatch) {
+      return exactMatch.symbol;
+    }
+
+    const fuzzyMatch = results.find((item) =>
+      item.symbol?.toUpperCase().startsWith(upperQuery) ||
+      item.description?.toUpperCase().includes(upperQuery)
+    );
+
+    return fuzzyMatch?.symbol || results[0].symbol;
+  } catch (error) {
+    console.error('Error searching Finnhub symbol:', error);
+    return null;
+  }
+}
+
+function getYahooSymbol(symbol) {
+  const normalized = symbol
+    .trim()
+    .replace(/\s+/g, '-')
+    .replaceAll('_', '-')
+    .replace(/\.STO$/i, '.ST')
+    .toUpperCase();
+
+  return YAHOO_SYMBOL_OVERRIDES[normalized] || normalized;
+}
+
+function getYahooFallbackSymbols(symbol) {
+  const normalized = symbol
+    .trim()
+    .replace(/\s+/g, '-')
+    .replaceAll('_', '-')
+    .replace(/\.STO$/i, '.ST')
+    .toUpperCase();
+
+  return YAHOO_SYMBOL_FALLBACKS[normalized] || [getYahooSymbol(symbol)];
+}
+
+async function tryYahooRequest(symbol, range, interval) {
+  const response = await axios.get(
+    `/api/stock/${encodeURIComponent(symbol)}?range=${range}&interval=${interval}`
+  );
+  return response?.data;
+}
+
+async function getYahooQuote(symbol, targetCurrency = 'SEK') {
+  const fallbackSymbols = getYahooFallbackSymbols(symbol);
+  let lastError = null;
+
+  for (const candidate of fallbackSymbols) {
+    try {
+      const responseData = await tryYahooRequest(candidate, '1d', '5m');
+      const result = responseData?.chart?.result?.[0];
+      const meta = result?.meta;
+      const quote = result?.indicators?.quote?.[0];
+      const latestIndex = Math.max(0, (quote?.close?.length ?? 1) - 1);
+      const currentPrice = meta?.regularMarketPrice ?? quote?.close?.[latestIndex];
+
+      if (currentPrice == null) {
+        if (responseData?.chart?.error || responseData?.chart?.result == null) {
+          lastError = new Error(`Yahoo no data for ${candidate}`);
+          continue;
+        }
+      }
+
+      const previousClose = meta?.chartPreviousClose ?? meta?.previousClose ?? quote?.close?.[Math.max(0, latestIndex - 1)] ?? 0;
+      const currency = meta?.currency || 'USD';
+      const convertedPrice = convertPrice(currentPrice, currency, targetCurrency);
+      const convertedPreviousClose = convertPrice(previousClose, currency, targetCurrency);
+      const openPrice = quote?.open?.[latestIndex] ?? currentPrice;
+      const highPrice = quote?.high?.[latestIndex] ?? currentPrice;
+      const lowPrice = quote?.low?.[latestIndex] ?? currentPrice;
+
+      return {
+        symbol: candidate,
+        price: convertedPrice,
+        change: convertedPrice - convertedPreviousClose,
+        changePercent: convertedPreviousClose ? ((convertedPrice - convertedPreviousClose) / convertedPreviousClose) * 100 : 0,
+        open: convertPrice(openPrice, currency, targetCurrency),
+        high: convertPrice(highPrice, currency, targetCurrency),
+        low: convertPrice(lowPrice, currency, targetCurrency),
+        volume: quote?.volume?.[latestIndex] || 0,
+        previousClose: convertedPreviousClose,
+        lastUpdated: meta?.regularMarketTime ? new Date(meta.regularMarketTime * 1000).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
+        currency: targetCurrency,
+        market: 'Yahoo Finance'
+      };
+    } catch (error) {
+      lastError = error;
+      console.warn(`Yahoo fallback ${candidate} failed:`, error?.message || error);
+      continue;
+    }
+  }
+
+  if (lastError) {
+    console.error(`Yahoo quote lookup failed for ${symbol}:`, lastError);
+  }
+  return null;
+}
+
+async function getYahooHistorical(symbol, timeframe = 'daily', targetCurrency = 'SEK') {
+  const fallbackSymbols = getYahooFallbackSymbols(symbol);
+  let lastError = null;
+
+  for (const candidate of fallbackSymbols) {
+    const yahooSymbol = candidate;
+    let range = '1mo';
+    let interval = '1d';
+
+    if (timeframe === 'weekly') {
+      range = '3mo';
+      interval = '1wk';
+    } else if (timeframe === 'monthly') {
+      range = '1y';
+      interval = '1mo';
+    }
+
+    try {
+      const response = await axios.get(
+        `/api/stock/${encodeURIComponent(yahooSymbol)}?range=${range}&interval=${interval}`
+      );
+
+      const result = response?.data?.chart?.result?.[0];
+      const quote = result?.indicators?.quote?.[0];
+      const timestamps = result?.timestamp;
+      const currency = result?.meta?.currency || 'SEK';
+
+      if (!timestamps || !quote) {
+        lastError = new Error(`Yahoo no data for ${yahooSymbol}`);
+        continue;
+      }
+
+      const history = timestamps
+        .map((timestamp, index) => {
+          const close = quote.close?.[index];
+          const open = quote.open?.[index];
+          const high = quote.high?.[index];
+          const low = quote.low?.[index];
+          const volume = quote.volume?.[index] ?? 0;
+
+          if (close == null || open == null || high == null || low == null) {
+            return null;
+          }
+
+          return {
+            date: new Date(timestamp * 1000).toISOString().split('T')[0],
+            open: convertPrice(open, currency, targetCurrency),
+            high: convertPrice(high, currency, targetCurrency),
+            low: convertPrice(low, currency, targetCurrency),
+            close: convertPrice(close, currency, targetCurrency),
+            volume,
+            currency: targetCurrency
+          };
+        })
+        .filter(Boolean);
+
+      if (history.length > 0) {
+        return history;
+      }
+
+      lastError = new Error(`Yahoo history no data for ${yahooSymbol}`);
+    } catch (error) {
+      lastError = error;
+      console.warn(`Yahoo historical fallback ${yahooSymbol} failed:`, error?.message || error);
+      continue;
+    }
+  }
+
+  if (lastError) {
+    console.error(`Yahoo historical lookup failed for ${symbol}:`, lastError);
+  }
+  return [];
+}
+
 // Search for stocks - tries Finnhub (works for most markets)
 export async function searchStocks(query) {
   try {
+    ensureFinnhubKey();
     const response = await axios.get(
-      `https://finnhub.io/api/v1/search?q=${query}&token=${FINNHUB_API_KEY}`
+      `https://finnhub.io/api/v1/search?q=${encodeURIComponent(query)}&token=${FINNHUB_API_KEY}`
     );
     
-    if (response.data && response.data.result) {
+    if (response?.data?.result) {
       return response.data.result.map(stock => ({
         symbol: stock.symbol,
         name: stock.description,
@@ -131,131 +343,246 @@ export async function searchStocks(query) {
   }
 }
 
-// Get stock price data - tries Oanor for Swedish stocks, Finnhub for others
+// Get stock price data - tries Oanor for Swedish stocks, then Yahoo for Stockholm stocks, then Finnhub
 export async function getStockPrice(symbol, targetCurrency = 'SEK') {
-  // Normalize symbol first (convert spaces to hyphens)
   const normalizedSymbol = normalizeSymbol(symbol);
-  
-  // Try Oanor API first for Swedish stocks
-  if (isNordicStock(normalizedSymbol) && OANOR_API_KEY) {
-    const oanorData = await getOanorStockData(normalizedSymbol);
-    if (oanorData) {
-      // Swedish stocks are in SEK natively, so we only convert if target is not SEK
-      const price = oanorData.currency !== targetCurrency
-        ? convertPrice(oanorData.price, oanorData.currency, targetCurrency)
-        : oanorData.price;
+  const requestKey = `${normalizedSymbol}:${targetCurrency}`;
 
-      const change = oanorData.currency !== targetCurrency
-        ? convertPrice(oanorData.change || 0, oanorData.currency, targetCurrency)
-        : (oanorData.change || 0);
-
-      return {
-        symbol: oanorData.symbol,
-        price: price,
-        change: change,
-        changePercent: oanorData.changePercent || 0,
-        open: price - change, // Estimate open price
-        high: price + Math.abs(change) * 0.5, // Estimate high
-        low: price - Math.abs(change) * 0.5, // Estimate low
-        volume: 0, // Oanor API might not provide volume
-        previousClose: price - change,
-        lastUpdated: oanorData.lastUpdated,
-        currency: targetCurrency,
-        market: oanorData.market
-      };
-    }
+  if (pendingPriceRequests.has(requestKey)) {
+    return pendingPriceRequests.get(requestKey);
   }
 
-  // Fall back to Finnhub for US stocks or if Oanor fails
-  try {
-    const response = await axios.get(
-      `https://finnhub.io/api/v1/quote?symbol=${normalizedSymbol}&token=${FINNHUB_API_KEY}`
-    );
-    
-    const quote = response.data;
-    if (quote && quote.c) {
+  const fetchPromise = (async () => {
+    if (isNordicStock(normalizedSymbol)) {
+      if (OANOR_API_KEY) {
+        const oanorData = await getOanorStockData(normalizedSymbol);
+        if (oanorData) {
+          const price = oanorData.currency !== targetCurrency
+            ? convertPrice(oanorData.price, oanorData.currency, targetCurrency)
+            : oanorData.price;
+
+          const change = oanorData.currency !== targetCurrency
+            ? convertPrice(oanorData.change || 0, oanorData.currency, targetCurrency)
+            : (oanorData.change || 0);
+
+          return {
+            symbol: oanorData.symbol,
+            price,
+            change,
+            changePercent: oanorData.changePercent || 0,
+            open: price - change,
+            high: price + Math.abs(change) * 0.5,
+            low: price - Math.abs(change) * 0.5,
+            volume: 0,
+            previousClose: price - change,
+            lastUpdated: oanorData.lastUpdated,
+            currency: targetCurrency,
+            market: oanorData.market
+          };
+        }
+      }
+
+      const yahooQuote = await getYahooQuote(normalizedSymbol, targetCurrency);
+      if (yahooQuote) {
+        return yahooQuote;
+      }
+    }
+
+    const tryFinnhubQuote = async (finnhubSymbol) => {
+      ensureFinnhubKey();
+      const response = await axios.get(
+        `https://finnhub.io/api/v1/quote?symbol=${encodeURIComponent(finnhubSymbol)}&token=${FINNHUB_API_KEY}`
+      );
+      const quote = response.data;
+
+      if (!quote?.c) {
+        return null;
+      }
+
       const currentPrice = quote.c;
-      const previousClose = quote.pc;
-      const change = currentPrice - previousClose;
-      const changePercent = (change / previousClose) * 100;
-      
-      // Convert prices to target currency
+      const previousClose = quote.pc ?? 0;
       const convertedPrice = convertPrice(currentPrice, 'USD', targetCurrency);
       const convertedPreviousClose = convertPrice(previousClose, 'USD', targetCurrency);
-      const convertedChange = convertedPrice - convertedPreviousClose;
-      const convertedOpen = convertPrice(quote.o, 'USD', targetCurrency);
-      const convertedHigh = convertPrice(quote.h, 'USD', targetCurrency);
-      const convertedLow = convertPrice(quote.l, 'USD', targetCurrency);
-      
+
       return {
-        symbol: symbol.toUpperCase(), // Keep original symbol format
+        symbol: finnhubSymbol,
         price: convertedPrice,
-        change: convertedChange,
-        changePercent: changePercent, // Percentage doesn't change with currency conversion
-        open: convertedOpen,
-        high: convertedHigh,
-        low: convertedLow,
-        volume: 0, // Finnhub quote doesn't include volume
+        change: convertedPrice - convertedPreviousClose,
+        changePercent: previousClose ? ((currentPrice - previousClose) / previousClose) * 100 : 0,
+        open: convertPrice(quote.o, 'USD', targetCurrency),
+        high: convertPrice(quote.h, 'USD', targetCurrency),
+        low: convertPrice(quote.l, 'USD', targetCurrency),
+        volume: 0,
         previousClose: convertedPreviousClose,
         lastUpdated: new Date().toISOString().split('T')[0],
         currency: targetCurrency
       };
+    };
+
+    try {
+      const finnhubResult = await tryFinnhubQuote(normalizedSymbol);
+      if (finnhubResult) {
+        return finnhubResult;
+      }
+
+      if (isNordicStock(normalizedSymbol)) {
+        const yahooQuote = await getYahooQuote(normalizedSymbol, targetCurrency);
+        if (yahooQuote) {
+          return yahooQuote;
+        }
+      }
+
+      throw new Error(`Failed to get price for ${symbol}. Please try again later.`);
+    } catch (error) {
+      const isForbidden = error.response?.status === 403;
+      const resolvedSymbol = await searchFinnhubSymbol(normalizedSymbol);
+
+      if (resolvedSymbol && resolvedSymbol !== normalizedSymbol) {
+        try {
+          const fallbackResult = await tryFinnhubQuote(resolvedSymbol);
+          if (fallbackResult) {
+            return fallbackResult;
+          }
+        } catch (innerError) {
+          console.error(`Failed Finnhub fallback with symbol ${resolvedSymbol}:`, innerError);
+        }
+      }
+
+      if (isNordicStock(normalizedSymbol)) {
+        const yahooQuote = await getYahooQuote(normalizedSymbol, targetCurrency);
+        if (yahooQuote) {
+          return yahooQuote;
+        }
+      }
+
+      if (isForbidden) {
+        throw new Error(
+          `${symbol} - Access to Finnhub quote data is restricted. ` +
+          `This may be caused by your Finnhub plan or token permissions.`
+        );
+      }
+
+      throw new Error(`Failed to get price for ${symbol}. Please try again later.`);
     }
-    return null;
-  } catch (error) {
-    console.error('Error getting stock price from Finnhub:', error);
-    
-    // Check for 403 error - could be symbol format issue or the stock not being available
-    if (error.response?.status === 403) {
-      throw new Error(
-        `${symbol} - This might be due to: ` +
-        `1) Incorrect symbol format (Swedish stocks use hyphens: VOLV-B.ST not VOLV B.ST) ` +
-        `2) The stock might not be available on Finnhub. ` +
-        `Try the correct symbol format or search for it first.`
-      );
-    }
-    
-    throw new Error(`Failed to get price for ${symbol}. Please try again later.`);
-  }
+  })();
+
+  pendingPriceRequests.set(requestKey, fetchPromise);
+  fetchPromise.finally(() => pendingPriceRequests.delete(requestKey));
+  return fetchPromise;
 }
 
-// Get historical data for charts - uses Finnhub
+// Get historical data for charts - uses Finnhub with a Yahoo fallback for Stockholm symbols
 export async function getHistoricalData(symbol, timeframe = 'daily', targetCurrency = 'SEK') {
+  const normalizedSymbol = normalizeSymbol(symbol);
+
+  if (isNordicStock(normalizedSymbol)) {
+    const yahooHistory = await getYahooHistorical(normalizedSymbol, timeframe, targetCurrency);
+    if (yahooHistory.length > 0) {
+      return yahooHistory;
+    }
+  }
+
   try {
-    // Normalize symbol first (convert spaces to hyphens)
-    const normalizedSymbol = normalizeSymbol(symbol);
-    
-    // Calculate date range (last 30 days for daily, etc.)
     const endDate = Math.floor(Date.now() / 1000);
-    const startDate = endDate - (30 * 24 * 60 * 60); // 30 days ago
-    
+    let startDate;
+    let resolution;
+
+    switch (timeframe) {
+      case 'weekly':
+        resolution = 'W';
+        startDate = endDate - 90 * 24 * 60 * 60;
+        break;
+      case 'monthly':
+        resolution = 'M';
+        startDate = endDate - 365 * 24 * 60 * 60;
+        break;
+      case 'daily':
+      default:
+        resolution = 'D';
+        startDate = endDate - 30 * 24 * 60 * 60;
+        break;
+    }
+
+    ensureFinnhubKey();
     const response = await axios.get(
-      `https://finnhub.io/api/v1/stock/candle?symbol=${normalizedSymbol}&resolution=D&from=${startDate}&to=${endDate}&token=${FINNHUB_API_KEY}`
+      `https://finnhub.io/api/v1/stock/candle?symbol=${encodeURIComponent(normalizedSymbol)}&resolution=${resolution}&from=${startDate}&to=${endDate}&token=${FINNHUB_API_KEY}`
     );
-    
-    if (response.data && response.data.s === 'ok' && response.data.t) {
+
+    if (response?.data?.s === 'ok' && response?.data?.t) {
       return response.data.t.map((timestamp, index) => ({
         date: new Date(timestamp * 1000).toISOString().split('T')[0],
         open: convertPrice(response.data.o[index], 'USD', targetCurrency),
         high: convertPrice(response.data.h[index], 'USD', targetCurrency),
         low: convertPrice(response.data.l[index], 'USD', targetCurrency),
         close: convertPrice(response.data.c[index], 'USD', targetCurrency),
-        volume: response.data.v[index],
+        volume: response.data.v ? response.data.v[index] : 0,
         currency: targetCurrency
       }));
     }
+
     return [];
   } catch (error) {
     console.error('Error getting historical data from Finnhub:', error);
-    
-    // Check for 403 error - could be symbol format issue or the stock not being available
-    if (error.response?.status === 403) {
+
+    const isForbidden = error.response?.status === 403;
+    if (!isForbidden) {
+      const resolvedSymbol = await searchFinnhubSymbol(normalizedSymbol);
+      if (resolvedSymbol && resolvedSymbol !== normalizedSymbol) {
+        try {
+          const endDate = Math.floor(Date.now() / 1000);
+          let startDate;
+          let resolution;
+
+          switch (timeframe) {
+            case 'weekly':
+              resolution = 'W';
+              startDate = endDate - 90 * 24 * 60 * 60;
+              break;
+            case 'monthly':
+              resolution = 'M';
+              startDate = endDate - 365 * 24 * 60 * 60;
+              break;
+            case 'daily':
+            default:
+              resolution = 'D';
+              startDate = endDate - 30 * 24 * 60 * 60;
+              break;
+          }
+
+          const response = await axios.get(
+            `https://finnhub.io/api/v1/stock/candle?symbol=${encodeURIComponent(resolvedSymbol)}&resolution=${resolution}&from=${startDate}&to=${endDate}&token=${FINNHUB_API_KEY}`
+          );
+
+          if (response?.data?.s === 'ok' && response?.data?.t) {
+            return response.data.t.map((timestamp, index) => ({
+              date: new Date(timestamp * 1000).toISOString().split('T')[0],
+              open: convertPrice(response.data.o[index], 'USD', targetCurrency),
+              high: convertPrice(response.data.h[index], 'USD', targetCurrency),
+              low: convertPrice(response.data.l[index], 'USD', targetCurrency),
+              close: convertPrice(response.data.c[index], 'USD', targetCurrency),
+              volume: response.data.v ? response.data.v[index] : 0,
+              currency: targetCurrency
+            }));
+          }
+        } catch (innerError) {
+          console.error(`Failed Finnhub historical fallback with symbol ${resolvedSymbol}:`, innerError);
+        }
+      }
+    }
+
+    if (isNordicStock(normalizedSymbol)) {
+      const yahooHistory = await getYahooHistorical(normalizedSymbol, timeframe, targetCurrency);
+      if (yahooHistory.length > 0) {
+        return yahooHistory;
+      }
+    }
+
+    if (isForbidden) {
       throw new Error(
-        `${symbol} - Historical data not available. ` +
-        `This might be due to incorrect symbol format or the stock not being available on Finnhub.`
+        `${symbol} - Historical data not available. This may be caused by an invalid Finnhub API key, usage limits, or access restrictions for this symbol.`
       );
     }
-    
+
     throw new Error(`Failed to get historical data for ${symbol}. Please try again later.`);
   }
 }

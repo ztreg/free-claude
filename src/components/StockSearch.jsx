@@ -1,21 +1,23 @@
-import { useState } from 'react';
-import { searchStocks, getStockPrice } from '../services/stockApi';
-import { useNotification } from '../context/NotificationContext';
-import { useCurrency } from '../context/CurrencyContext';
-import './StockSearch.css';
+import { useState, useEffect } from "react";
+import { searchStocks, getStockPrice } from "../services/stockApi";
+import { useNotification } from "../context/NotificationContext";
+import { useCurrency } from "../context/CurrencyContext";
+import "./StockSearch.css";
 
 function StockSearch({ onAddStock, watchlist }) {
   const { showNotification } = useNotification();
   const { currency, formatPrice } = useCurrency();
-  const [query, setQuery] = useState('');
+  const [query, setQuery] = useState("");
   const [results, setResults] = useState([]);
+  const [resultPrices, setResultPrices] = useState({});
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
+  const [loadingResultPrices, setLoadingResultPrices] = useState(false);
+  const [error, setError] = useState("");
   const [inspectingStock, setInspectingStock] = useState(null);
   const [loadingPrice, setLoadingPrice] = useState(false);
 
   const isStockInWatchlist = (symbol) => {
-    return watchlist.some(stock => stock.ticker === symbol);
+    return watchlist.some((stock) => stock.ticker === symbol);
   };
 
   const handleSearch = async (e) => {
@@ -23,19 +25,23 @@ function StockSearch({ onAddStock, watchlist }) {
     if (!query.trim()) return;
 
     setLoading(true);
-    setError('');
+    setError("");
     setResults([]);
     setInspectingStock(null);
 
     try {
       const stocks = await searchStocks(query);
       setResults(stocks);
-      
+
       if (stocks.length === 0) {
-        setError('No stocks found. Try a different search term.');
+        setError("No stocks found. Try a different search term.");
       }
     } catch (err) {
-      showNotification('Failed to search stocks. Please try again.', 'error', 5000);
+      showNotification(
+        "Failed to search stocks. Please try again.",
+        "error",
+        5000,
+      );
     } finally {
       setLoading(false);
     }
@@ -50,13 +56,17 @@ function StockSearch({ onAddStock, watchlist }) {
   const handleInspectStock = async (stock) => {
     setInspectingStock(stock);
     setLoadingPrice(true);
-    
+
     try {
       const priceData = await getStockPrice(stock.symbol, currency);
       setInspectingStock({ ...stock, priceData });
     } catch (err) {
-      console.error('Error loading stock price:', err);
-      showNotification(`Failed to load price for ${stock.symbol}`, 'error', 5000);
+      console.error("Error loading stock price:", err);
+      showNotification(
+        `Failed to load price for ${stock.symbol}`,
+        "error",
+        5000,
+      );
       setInspectingStock({ ...stock, priceData: null });
     } finally {
       setLoadingPrice(false);
@@ -66,6 +76,35 @@ function StockSearch({ onAddStock, watchlist }) {
   const closeInspection = () => {
     setInspectingStock(null);
   };
+
+  useEffect(() => {
+    const loadResultPrices = async (stocks) => {
+      if (!stocks || stocks.length === 0) {
+        setResultPrices({});
+        return;
+      }
+
+      setLoadingResultPrices(true);
+      const prices = {};
+      const items = stocks.slice(0, 8);
+
+      await Promise.all(
+        items.map(async (stock) => {
+          try {
+            prices[stock.symbol] = await getStockPrice(stock.symbol, currency);
+          } catch (err) {
+            console.warn(`Price lookup failed for ${stock.symbol}:`, err);
+            prices[stock.symbol] = null;
+          }
+        }),
+      );
+
+      setResultPrices(prices);
+      setLoadingResultPrices(false);
+    };
+
+    loadResultPrices(results);
+  }, [results, currency]);
 
   return (
     <div className="stock-search">
@@ -78,7 +117,7 @@ function StockSearch({ onAddStock, watchlist }) {
           className="search-input"
         />
         <button type="submit" disabled={loading} className="search-button">
-          {loading ? 'Searching...' : 'Search'}
+          {loading ? "Searching..." : "Search"}
         </button>
       </form>
 
@@ -88,22 +127,33 @@ function StockSearch({ onAddStock, watchlist }) {
         <div className="search-results">
           <h3>Search Results</h3>
           <ul className="results-list">
-            {results.map((stock, index) => {
+            {results.map((stock, i) => {
               const isInWatchlist = isStockInWatchlist(stock.symbol);
+              const searchPrice = resultPrices[stock.symbol];
               return (
-                <li key={index} className="result-item">
-                  <div 
+                <li key={i} className="result-item">
+                  <div
                     className="stock-info clickable"
                     onClick={() => handleInspectStock(stock)}
                   >
-                    <span className="stock-symbol">{stock.symbol}</span>
-                    <span className="stock-name">{stock.name}</span>
-                    {stock.type && (
-                      <span className="stock-details">
-                        {stock.type}
+                    <div className="stock-top-row">
+                      <span className="stock-symbol">{stock.symbol}</span>
+                    </div>
+                    <span className="stock-name">
+                      {stock.name}
+                      <span className="stock-price">
+                        {searchPrice?.price != null
+                          ? formatPrice(searchPrice.price)
+                          : loadingResultPrices
+                            ? "Loading…"
+                            : "No price"}
                       </span>
+                    </span>
+                    {stock.type && (
+                      <span className="stock-details">{stock.type}</span>
                     )}
                   </div>
+
                   {isInWatchlist ? (
                     <div className="tracked-indicator">
                       <span className="checkmark">✓</span>
@@ -131,10 +181,12 @@ function StockSearch({ onAddStock, watchlist }) {
           <div className="inspection-content">
             <div className="inspection-header">
               <h2>{inspectingStock.symbol}</h2>
-              <button onClick={closeInspection} className="close-button">×</button>
+              <button onClick={closeInspection} className="close-button">
+                ×
+              </button>
             </div>
             <p className="inspection-company">{inspectingStock.name}</p>
-            
+
             {loadingPrice ? (
               <div className="inspection-loading">Loading price data...</div>
             ) : inspectingStock.priceData ? (
@@ -142,9 +194,12 @@ function StockSearch({ onAddStock, watchlist }) {
                 <span className="inspection-current-price">
                   {formatPrice(inspectingStock.priceData.price)}
                 </span>
-                <span className={`inspection-change ${inspectingStock.priceData.change >= 0 ? 'positive' : 'negative'}`}>
-                  {inspectingStock.priceData.change >= 0 ? '+' : ''}{formatPrice(inspectingStock.priceData.change)} 
-                  ({inspectingStock.priceData.changePercent.toFixed(2)}%)
+                <span
+                  className={`inspection-change ${inspectingStock.priceData.change >= 0 ? "positive" : "negative"}`}
+                >
+                  {inspectingStock.priceData.change >= 0 ? "+" : ""}
+                  {formatPrice(inspectingStock.priceData.change)}(
+                  {inspectingStock.priceData.changePercent.toFixed(2)}%)
                 </span>
               </div>
             ) : (
@@ -158,7 +213,7 @@ function StockSearch({ onAddStock, watchlist }) {
                   <span>Already in watchlist</span>
                 </div>
               ) : (
-                <button 
+                <button
                   onClick={() => handleAddStock(inspectingStock)}
                   className="inspection-add-button"
                 >

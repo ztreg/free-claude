@@ -1,7 +1,6 @@
 import { useState } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
-import { useNavigate } from 'react-router-dom';
-import logo from '../../logo.png';
 import './Auth.css';
 
 function Signup() {
@@ -106,7 +105,7 @@ function Signup() {
         </form>
         
         <p className="auth-switch">
-          Already have an account? <a href="/login">Sign in</a>
+          Already have an account? <Link to="/login">Sign in</Link>
         </p>
       </div>
     </div>

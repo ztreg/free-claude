@@ -17,16 +17,32 @@ function StockChart({ symbol, onClose }) {
     loadHistoricalData();
   }, [symbol, timeframe, currency]);
 
+  const roundChartValue = (value) => {
+    if (typeof value !== 'number' || Number.isNaN(value)) {
+      return value;
+    }
+    return Number(value.toFixed(2));
+  };
+
   const loadHistoricalData = async () => {
     setLoading(true);
     setError('');
     
     try {
       const historicalData = await getHistoricalData(symbol, timeframe, currency);
-      setData(historicalData);
+      setData(
+        historicalData.map((row) => ({
+          ...row,
+          open: roundChartValue(row.open),
+          high: roundChartValue(row.high),
+          low: roundChartValue(row.low),
+          close: roundChartValue(row.close)
+        }))
+      );
     } catch (err) {
-      setError('Failed to load historical data');
-      showNotification(`Failed to load historical data for ${symbol}`, 'error', 5000);
+      const message = err?.message || 'Failed to load historical data';
+      setError(message);
+      showNotification(`Failed to load historical data for ${symbol}: ${message}`, 'error', 5000);
       console.error(err);
     } finally {
       setLoading(false);
@@ -40,9 +56,94 @@ function StockChart({ symbol, onClose }) {
 
   const formatTooltip = (value, name) => {
     if (name === 'close') {
-      return [formatPrice(value), 'Close Price'];
+      return [formatPrice(roundChartValue(value)), 'Close Price'];
     }
-    return [value, name];
+    return [roundChartValue(value), name];
+  };
+
+  useEffect(() => {
+    const handleKeyDown = (event) => {
+      if (event.key === 'Escape') {
+        onClose();
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [onClose]);
+
+  const renderChartBody = () => {
+    if (loading) {
+      return <div className="chart-loading">Loading chart data...</div>;
+    }
+    if (error) {
+      return <div className="chart-error">{error}</div>;
+    }
+    if (data.length === 0) {
+      return <div className="chart-error">No historical data available</div>;
+    }
+
+    return (
+      <div className="chart-content">
+        <ResponsiveContainer width="100%" height={400}>
+          <LineChart data={data}>
+            <CartesianGrid strokeDasharray="3 3" stroke="#e0e0e0" />
+            <XAxis
+              dataKey="date"
+              tickFormatter={formatXAxis}
+              stroke="#666"
+              fontSize={12}
+            />
+            <YAxis
+              tickFormatter={(value) => {
+                const formatted = formatPrice(value);
+                return formatted.replace(/\.\d+$/, '');
+              }}
+              stroke="#666"
+              fontSize={12}
+            />
+            <Tooltip
+              formatter={formatTooltip}
+              contentStyle={{
+                backgroundColor: 'white',
+                border: '1px solid #ddd',
+                borderRadius: '8px',
+                boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
+              }}
+            />
+            <Legend />
+            <Line
+              type="monotone"
+              dataKey="close"
+              stroke="#667eea"
+              strokeWidth={2}
+              dot={false}
+              activeDot={{ r: 6 }}
+              name="Close Price"
+            />
+          </LineChart>
+        </ResponsiveContainer>
+
+        <div className="chart-stats">
+          <div className="stat">
+            <span className="stat-label">Period</span>
+            <span className="stat-value">{data.length} {timeframe} periods</span>
+          </div>
+          <div className="stat">
+            <span className="stat-label">Highest</span>
+            <span className="stat-value">{formatPrice(Math.max(...data.map((d) => d.high)))}</span>
+          </div>
+          <div className="stat">
+            <span className="stat-label">Lowest</span>
+            <span className="stat-value">{formatPrice(Math.min(...data.map((d) => d.low)))}</span>
+          </div>
+          <div className="stat">
+            <span className="stat-label">Average</span>
+            <span className="stat-value">{formatPrice(data.reduce((sum, d) => sum + d.close, 0) / data.length)}</span>
+          </div>
+        </div>
+      </div>
+    );
   };
 
   return (
@@ -65,74 +166,7 @@ function StockChart({ symbol, onClose }) {
           ))}
         </div>
 
-        {loading ? (
-          <div className="chart-loading">Loading chart data...</div>
-        ) : error ? (
-          <div className="chart-error">{error}</div>
-        ) : data.length === 0 ? (
-          <div className="chart-error">No historical data available</div>
-        ) : (
-          <div className="chart-content">
-            <ResponsiveContainer width="100%" height={400}>
-              <LineChart data={data}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#e0e0e0" />
-                <XAxis 
-                  dataKey="date" 
-                  tickFormatter={formatXAxis}
-                  stroke="#666"
-                  fontSize={12}
-                />
-                <YAxis 
-                  tickFormatter={(value) => {
-                    const formatted = formatPrice(value);
-                    // Remove decimal places for cleaner axis labels
-                    return formatted.replace(/\.\d+$/, '');
-                  }}
-                  stroke="#666"
-                  fontSize={12}
-                />
-                <Tooltip 
-                  formatter={formatTooltip}
-                  contentStyle={{
-                    backgroundColor: 'white',
-                    border: '1px solid #ddd',
-                    borderRadius: '8px',
-                    boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
-                  }}
-                />
-                <Legend />
-                <Line 
-                  type="monotone" 
-                  dataKey="close" 
-                  stroke="#667eea" 
-                  strokeWidth={2}
-                  dot={false}
-                  activeDot={{ r: 6 }}
-                  name="Close Price"
-                />
-              </LineChart>
-            </ResponsiveContainer>
-
-            <div className="chart-stats">
-              <div className="stat">
-                <span className="stat-label">Period</span>
-                <span className="stat-value">{data.length} {timeframe} periods</span>
-              </div>
-              <div className="stat">
-                <span className="stat-label">Highest</span>
-                <span className="stat-value">{formatPrice(Math.max(...data.map(d => d.high)))}</span>
-              </div>
-              <div className="stat">
-                <span className="stat-label">Lowest</span>
-                <span className="stat-value">{formatPrice(Math.min(...data.map(d => d.low)))}</span>
-              </div>
-              <div className="stat">
-                <span className="stat-label">Average</span>
-                <span className="stat-value">{formatPrice(data.reduce((sum, d) => sum + d.close, 0) / data.length)}</span>
-              </div>
-            </div>
-          </div>
-        )}
+        {renderChartBody()}
       </div>
     </div>
   );

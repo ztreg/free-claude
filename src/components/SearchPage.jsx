@@ -1,33 +1,18 @@
-import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import StockSearch from './StockSearch';
 import Header from './Header';
-import { addToWatchlist, getWatchlist } from '../services/watchlistService';
 import { useNotification } from '../context/NotificationContext';
+import { useStockMarket } from '../context/StockMarketContext';
 import './SearchPage.css';
 
 function SearchPage() {
   const navigate = useNavigate();
   const { showNotification } = useNotification();
-  const [watchlist, setWatchlist] = useState([]);
-
-  const loadWatchlist = async () => {
-    try {
-      const stocks = await getWatchlist();
-      setWatchlist(stocks);
-    } catch (error) {
-      console.error('Error loading watchlist:', error);
-    }
-  };
-
-  useEffect(() => {
-    loadWatchlist();
-  }, []);
+  const { watchlist, addStockToWatchlist } = useStockMarket();
 
   const handleAddStock = async (stock) => {
     try {
-      await addToWatchlist(stock);
-      await loadWatchlist(); // Reload to update UI checkboxes
+      await addStockToWatchlist(stock);
       showNotification(`${stock.symbol} added to watchlist!`, 'success', 5000);
     } catch (error) {
       if (error.message === 'Stock already in watchlist') {
