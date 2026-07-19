@@ -1,8 +1,12 @@
 import { useState } from 'react';
 import { searchStocks, getStockPrice } from '../services/stockApi';
+import { useNotification } from '../context/NotificationContext';
+import { useCurrency } from '../context/CurrencyContext';
 import './StockSearch.css';
 
 function StockSearch({ onAddStock, watchlist }) {
+  const { showNotification } = useNotification();
+  const { currency, formatPrice } = useCurrency();
   const [query, setQuery] = useState('');
   const [results, setResults] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -31,7 +35,7 @@ function StockSearch({ onAddStock, watchlist }) {
         setError('No stocks found. Try a different search term.');
       }
     } catch (err) {
-      setError('Failed to search stocks. Please try again.');
+      showNotification('Failed to search stocks. Please try again.', 'error', 5000);
     } finally {
       setLoading(false);
     }
@@ -48,10 +52,11 @@ function StockSearch({ onAddStock, watchlist }) {
     setLoadingPrice(true);
     
     try {
-      const priceData = await getStockPrice(stock.symbol);
+      const priceData = await getStockPrice(stock.symbol, currency);
       setInspectingStock({ ...stock, priceData });
     } catch (err) {
       console.error('Error loading stock price:', err);
+      showNotification(`Failed to load price for ${stock.symbol}`, 'error', 5000);
       setInspectingStock({ ...stock, priceData: null });
     } finally {
       setLoadingPrice(false);
@@ -135,10 +140,10 @@ function StockSearch({ onAddStock, watchlist }) {
             ) : inspectingStock.priceData ? (
               <div className="inspection-price">
                 <span className="inspection-current-price">
-                  ${inspectingStock.priceData.price.toFixed(2)}
+                  {formatPrice(inspectingStock.priceData.price)}
                 </span>
                 <span className={`inspection-change ${inspectingStock.priceData.change >= 0 ? 'positive' : 'negative'}`}>
-                  {inspectingStock.priceData.change >= 0 ? '+' : ''}{inspectingStock.priceData.change.toFixed(2)} 
+                  {inspectingStock.priceData.change >= 0 ? '+' : ''}{formatPrice(inspectingStock.priceData.change)} 
                   ({inspectingStock.priceData.changePercent.toFixed(2)}%)
                 </span>
               </div>

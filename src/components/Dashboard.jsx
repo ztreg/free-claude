@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useNotification } from '../context/NotificationContext';
+import { useCurrency } from '../context/CurrencyContext';
 import { useNavigate } from 'react-router-dom';
 import StockChart from './StockChart';
 import Header from './Header';
@@ -11,6 +12,7 @@ import './Dashboard.css';
 function Dashboard() {
   const { user, signOut } = useAuth();
   const { showNotification } = useNotification();
+  const { currency, formatPrice } = useCurrency();
   const navigate = useNavigate();
   const [watchlist, setWatchlist] = useState([]);
   const [stockPrices, setStockPrices] = useState({});
@@ -22,6 +24,13 @@ function Dashboard() {
     loadWatchlist();
   }, []);
 
+  useEffect(() => {
+    // Reload prices when currency changes
+    if (watchlist.length > 0) {
+      loadWatchlist();
+    }
+  }, [currency]);
+
   const loadWatchlist = async () => {
     try {
       const stocks = await getWatchlist();
@@ -31,10 +40,11 @@ function Dashboard() {
       const prices = {};
       for (const stock of stocks) {
         try {
-          const price = await getStockPrice(stock.ticker);
+          const price = await getStockPrice(stock.ticker, currency);
           prices[stock.ticker] = price;
         } catch (error) {
           console.error(`Error loading price for ${stock.ticker}:`, error);
+          showNotification(`Failed to load price for ${stock.ticker}, "I need to find another API" `, 'error', 5000);
         }
       }
       setStockPrices(prices);
@@ -113,9 +123,9 @@ function Dashboard() {
                       <p className="company-name">{stock.company_name || stock.ticker}</p>
                       {price ? (
                         <div className="stock-price">
-                          <span className="current-price">${price.price.toFixed(2)}</span>
+                          <span className="current-price">{formatPrice(price.price)}</span>
                           <span className={`price-change ${price.change >= 0 ? 'positive' : 'negative'}`}>
-                            {price.change >= 0 ? '+' : ''}{price.change.toFixed(2)} ({price.changePercent.toFixed(2)}%)
+                            {price.change >= 0 ? '+' : ''}{formatPrice(price.change)} ({price.changePercent.toFixed(2)}%)
                           </span>
                         </div>
                       ) : (
@@ -144,10 +154,10 @@ function Dashboard() {
             {stockPrices[selectedStock.ticker] && (
               <div className="detail-price">
                 <span className="detail-current-price">
-                  ${stockPrices[selectedStock.ticker].price.toFixed(2)}
+                  {formatPrice(stockPrices[selectedStock.ticker].price)}
                 </span>
                 <span className={`detail-change ${stockPrices[selectedStock.ticker].change >= 0 ? 'positive' : 'negative'}`}>
-                  {stockPrices[selectedStock.ticker].change >= 0 ? '+' : ''}{stockPrices[selectedStock.ticker].change.toFixed(2)} 
+                  {stockPrices[selectedStock.ticker].change >= 0 ? '+' : ''}{formatPrice(stockPrices[selectedStock.ticker].change)} 
                   ({stockPrices[selectedStock.ticker].changePercent.toFixed(2)}%)
                 </span>
               </div>

@@ -70,6 +70,69 @@
   background: #0052a3;
 }
 
+.currency-selector {
+  position: relative;
+}
+
+.currency-button {
+  padding: 0.5rem 0.75rem;
+  background: #f3f4f6;
+  color: #1a1a1a;
+  border: 1px solid #d1d5db;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.75rem;
+  font-weight: 500;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  white-space: nowrap;
+}
+
+.currency-button:hover {
+  background: #e5e7eb;
+}
+
+.currency-dropdown {
+  position: absolute;
+  top: calc(100% + 0.5rem);
+  right: 0;
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  min-width: 120px;
+  z-index: 100;
+  overflow: hidden;
+}
+
+.currency-option {
+  width: 100%;
+  padding: 0.75rem 1rem;
+  background: none;
+  border: none;
+  text-align: left;
+  cursor: pointer;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: #1a1a1a;
+  transition: background 0.2s;
+}
+
+.currency-option:hover {
+  background: #f3f4f6;
+}
+
+.currency-option.active {
+  background: #0066cc;
+  color: #ffffff;
+}
+
+.currency-option.active:hover {
+  background: #0052a3;
+}
+
 .user-menu {
   position: relative;
 }
@@ -155,13 +218,18 @@
   }
 
   .header-nav-button,
-  .user-menu-button {
+  .user-menu-button,
+  .currency-button {
     padding: 0.5rem 1rem;
     font-size: 0.875rem;
   }
 
   .dropdown-menu {
     min-width: 180px;
+  }
+
+  .currency-dropdown {
+    min-width: 140px;
   }
 }
 
@@ -175,8 +243,8 @@
   }
 
   .logo {
-    height: 100px;
-    width: 100px;
+    height: 48px;
+    width: 48px;
   }
 
   .header h1 {
@@ -188,7 +256,8 @@
   }
 
   .header-nav-button,
-  .user-menu-button {
+  .user-menu-button,
+  .currency-button {
     padding: 0.5rem 1rem;
     font-size: 0.875rem;
   }

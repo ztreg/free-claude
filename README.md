@@ -6,8 +6,11 @@ A modern stock tracking application built with React, Vite, and Supabase. Track 
 
 - 🔐 Custom username/password authentication (no email required)
 - 📊 Real-time stock prices and market data
+- 🇸🇪 **Swedish stock support** (via optional Oanor API)
+- 🇺🇸 US/International stock support via Finnhub API
 - 📈 Interactive charts with multiple timeframes
 - 👀 Personalized watchlist management
+- 💱 Multi-currency support (SEK, USD, EUR, GBP)
 - 🎨 Modern, responsive design
 - 🚀 Ready for deployment on free hosting platforms
 
@@ -18,13 +21,16 @@ A modern stock tracking application built with React, Vite, and Supabase. Track 
 - **Database**: Supabase PostgreSQL
 - **Charts**: Recharts
 - **Routing**: React Router
-- **Stock Data**: Finnhub API
+- **Stock Data**: 
+  - **Swedish**: Oanor API (optional, 100 calls/month free)
+  - **US/International**: Finnhub API (free tier available)
 
 ## Prerequisites
 
 - Node.js 16+ and npm
 - Free Supabase account
-- Free Finnhub API key
+- **Optional**: Free Finnhub API key (for US/International stocks)
+- **Optional**: Free Oanor API key (for Swedish stocks - 100 calls/month free)
 
 ## Quick Start
 
@@ -44,15 +50,28 @@ Follow the detailed setup guide in [SUPABASE_SETUP.md](SUPABASE_SETUP.md):
 4. Set up authentication
 5. Create database tables
 
-### 3. Configure Stock API
+### 3. Configure Stock API (Optional)
 
-1. Get a free Finnhub API key from [https://finnhub.io/](https://finnhub.io/)
-2. Update the API key in `src/services/stockApi.js`:
-   ```javascript
-   const FINNHUB_API_KEY = 'your_actual_api_key';
+The app works out of the box with basic functionality. For full stock data support:
+
+**For Swedish stocks (VOLV-B.ST, etc.):**
+1. Get a free Oanor API key from [https://oanor.com](https://www.oanor.com/api/sweden-stock-api)
+2. Add it to your `.env` file:
    ```
+   VITE_OANOR_API_KEY=your_actual_api_key
+   ```
+   - Free tier: 100 calls/month
+   - Provides real-time Swedish stock data in SEK
 
-**Finnhub Free Tier:** 60 calls/minute (86,400/day) - No rate limiting issues!
+**For US/International stocks (AAPL, GOOGL, etc.):**
+1. Get a free Finnhub API key from [https://finnhub.io/](https://finnhub.io/)
+2. Add it to your `.env` file:
+   ```
+   VITE_FINNHUB_API_KEY=your_actual_api_key
+   ```
+   - Free tier: 60 calls/minute (86,400/day)
+
+**Note**: The app will work with limited functionality without API keys, but full stock data requires at least one API key.
 
 ### 4. Start Development
 
@@ -128,6 +147,12 @@ VITE_SUPABASE_ANON_KEY=your_supabase_anon_key
 3. **Add to Watchlist**: Click "Search" to track stocks
 4. **View Dashboard**: See all your followed stocks with current prices
 5. **Analyze**: Click on any stock to view detailed charts and performance
+6. **Select Currency**: Use the currency dropdown in the header to switch between SEK, USD, EUR, GBP
+
+**Note**: 
+- Configure the Oanor API key for Swedish stocks (VOLV-B.ST, etc.) in SEK
+- Configure the Finnhub API key for US/International stocks (AAPL, GOOGL, etc.)
+- The currency selector converts stock prices to your preferred currency
 
 ## Features in Detail
 
@@ -137,10 +162,12 @@ VITE_SUPABASE_ANON_KEY=your_supabase_anon_key
 - Protected routes for authenticated users
 
 ### Stock Data
-- Real-time price updates (via Finnhub API)
+- Real-time price updates (via Oanor API for Swedish stocks, Finnhub for others)
 - Historical data for charts
 - Support for multiple timeframes (daily, weekly, monthly)
-- 86,400 API calls/day on free tier - no rate limiting!
+- Swedish stocks: Oanor API (100 calls/month free)
+- US/International stocks: Finnhub API (86,400 calls/day free)
+- Currency conversion for displaying prices in SEK, EUR, GBP, etc.
 
 ### Watchlist Management
 - Add/remove stocks from your watchlist
@@ -162,9 +189,11 @@ VITE_SUPABASE_ANON_KEY=your_supabase_anon_key
 - Ensure Row Level Security policies are configured
 
 ### Stock API Issues
-- Finnhub has generous free tier (86,400 calls/day)
-- If you see rate limiting, get a free API key from finnhub.io
-- The app includes mock data as fallback
+- For Swedish stocks: Get a free Oanor API key from oanor.com (100 calls/month)
+- For US/International stocks: Get a free Finnhub API key from finnhub.io (86,400 calls/day)
+- **403 Error**: This typically means incorrect symbol format or missing API key
+- Swedish stocks should use format like VOLV-B.ST (with hyphen, not space)
+- The currency selector converts stock prices to your preferred currency (SEK, EUR, etc.)
 
 ### Build Errors
 - Clear node_modules and reinstall: `rm -rf node_modules && npm install`

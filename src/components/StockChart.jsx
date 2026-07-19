@@ -1,9 +1,13 @@
 import { useState, useEffect } from 'react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { getHistoricalData } from '../services/stockApi';
+import { useNotification } from '../context/NotificationContext';
+import { useCurrency } from '../context/CurrencyContext';
 import './StockChart.css';
 
 function StockChart({ symbol, onClose }) {
+  const { showNotification } = useNotification();
+  const { currency, formatPrice } = useCurrency();
   const [data, setData] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -11,17 +15,18 @@ function StockChart({ symbol, onClose }) {
 
   useEffect(() => {
     loadHistoricalData();
-  }, [symbol, timeframe]);
+  }, [symbol, timeframe, currency]);
 
   const loadHistoricalData = async () => {
     setLoading(true);
     setError('');
     
     try {
-      const historicalData = await getHistoricalData(symbol, timeframe);
+      const historicalData = await getHistoricalData(symbol, timeframe, currency);
       setData(historicalData);
     } catch (err) {
       setError('Failed to load historical data');
+      showNotification(`Failed to load historical data for ${symbol}`, 'error', 5000);
       console.error(err);
     } finally {
       setLoading(false);
@@ -35,7 +40,7 @@ function StockChart({ symbol, onClose }) {
 
   const formatTooltip = (value, name) => {
     if (name === 'close') {
-      return [`$${value.toFixed(2)}`, 'Close Price'];
+      return [formatPrice(value), 'Close Price'];
     }
     return [value, name];
   };
@@ -78,7 +83,11 @@ function StockChart({ symbol, onClose }) {
                   fontSize={12}
                 />
                 <YAxis 
-                  tickFormatter={(value) => `$${value.toFixed(0)}`}
+                  tickFormatter={(value) => {
+                    const formatted = formatPrice(value);
+                    // Remove decimal places for cleaner axis labels
+                    return formatted.replace(/\.\d+$/, '');
+                  }}
                   stroke="#666"
                   fontSize={12}
                 />
@@ -111,15 +120,15 @@ function StockChart({ symbol, onClose }) {
               </div>
               <div className="stat">
                 <span className="stat-label">Highest</span>
-                <span className="stat-value">${Math.max(...data.map(d => d.high)).toFixed(2)}</span>
+                <span className="stat-value">{formatPrice(Math.max(...data.map(d => d.high)))}</span>
               </div>
               <div className="stat">
                 <span className="stat-label">Lowest</span>
-                <span className="stat-value">${Math.min(...data.map(d => d.low)).toFixed(2)}</span>
+                <span className="stat-value">{formatPrice(Math.min(...data.map(d => d.low)))}</span>
               </div>
               <div className="stat">
                 <span className="stat-label">Average</span>
-                <span className="stat-value">${(data.reduce((sum, d) => sum + d.close, 0) / data.length).toFixed(2)}</span>
+                <span className="stat-value">{formatPrice(data.reduce((sum, d) => sum + d.close, 0) / data.length)}</span>
               </div>
             </div>
           </div>
