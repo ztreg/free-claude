@@ -1,7 +1,12 @@
 function extractSymbolFromPath(path) {
   if (!path) return null;
-  const match = path.match(/\/\.netlify\/functions\/stock\/(.+)$/);
-  return match ? decodeURIComponent(match[1]) : null;
+  const cleaned = path.replace(/\/+$|^\/+/, '');
+  const parts = cleaned.split('/');
+  const stockIndex = parts.findIndex((segment) => segment === 'stock');
+  if (stockIndex >= 0 && parts.length > stockIndex + 1) {
+    return decodeURIComponent(parts.slice(stockIndex + 1).join('/'));
+  }
+  return null;
 }
 
 exports.handler = async function (event) {
