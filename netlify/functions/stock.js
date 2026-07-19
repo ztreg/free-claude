@@ -1,5 +1,12 @@
+function extractSymbolFromPath(path) {
+  if (!path) return null;
+  const match = path.match(/\/\.netlify\/functions\/stock\/(.+)$/);
+  return match ? decodeURIComponent(match[1]) : null;
+}
+
 exports.handler = async function (event) {
-  const symbol = event.queryStringParameters?.symbol;
+  const pathSymbol = extractSymbolFromPath(event.path || event.rawPath);
+  const symbol = event.queryStringParameters?.symbol || pathSymbol;
   const range = event.queryStringParameters?.range || '1d';
   const interval = event.queryStringParameters?.interval || '5m';
 

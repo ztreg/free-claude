@@ -5,7 +5,7 @@
 
 [[redirects]]
   from = "/api/stock/:symbol"
-  to = "/.netlify/functions/stock?symbol=:symbol"
+  to = "/.netlify/functions/stock/:symbol"
   status = 200
   force = true
   preserveQueryString = true
