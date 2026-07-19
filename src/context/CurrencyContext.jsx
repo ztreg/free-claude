@@ -31,7 +31,7 @@ export const CurrencyProvider = ({ children }) => {
 
   const formatPrice = (price, currentCurrency = currency) => {
     const symbol = currencySymbols[currentCurrency] || currentCurrency;
-    return `${symbol}${price.toFixed(2)}`;
+    return `${price.toFixed(2)} ${symbol}`;
   };
 
   const value = {
